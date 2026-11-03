@@ -121,6 +121,7 @@ textarea{width:100%;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;backgrou
 .explain{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 14px;margin-top:12px;font-size:14px;max-width:80ch}.explain h3{margin-top:12px}.explain p{margin:8px 0}
 .authmsg{flex-basis:100%;margin:0;color:var(--neg);font-weight:600}.authbar .link{flex-basis:100%;text-align:left;font-size:13px;font-weight:500}
 .authbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px}
+.t tr.inelig th,.t tr.inelig td{background:var(--surface2);color:var(--muted)}.t.rank td:first-child{font-weight:600;width:28px}
 .warn{display:inline-block;margin-left:6px;font-size:12px;color:var(--neg)}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 .scroll+.kpis{margin-top:14px}
@@ -398,6 +399,16 @@ const COLS=[
  ['rating','Rating',p=>p.rating??'–',p=>p.rating||0],
  ['dr','Δ seizoen',p=>`<span class="${p.dRating>0?'pos':p.dRating<0?'neg':''}">${sgn(p.dRating)}</span>`,p=>p.dRating||0],
 ];
+function rankTable(R){
+  const weeks=R.T.n;if(!weeks)return '<p class="empty">Nog geen wedstrijden.</p>';
+  const rows=R.players.filter(p=>p.S.w+p.S.l>0||p.inLineup>0).map(p=>{const sp=p.S.w+p.S.l,win=sp?p.S.w/sp:0,part=sp/weeks;
+    return {p,sp,win,part,score:100*(0.7*win+0.3*part),ok:part>=0.7};});
+  rows.sort((a,b)=>(b.ok-a.ok)||(b.score-a.score)||(b.p.S.w-a.p.S.w));
+  const need=Math.ceil(0.7*weeks-1e-9);let pos=0;
+  return `<div class="scroll"><table class="t rank"><thead><tr><th>#</th><th>Speler</th><th>Score</th><th>Enkels</th><th>Winst %</th><th>Deelname</th></tr></thead><tbody>
+   ${rows.map(r=>`<tr class="${r.ok?'':'inelig'}"><td>${r.ok?++pos:'–'}</td><th>${h(r.p.name)}</th><td><b>${num(r.score)}</b></td><td>${r.p.S.w}–${r.p.S.l}</td><td>${P0(r.win)}</td><td>${r.sp}/${weeks} <span class="muted">${P0(r.part)}</span></td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="explain"><h3>Zo werkt de seizoensranking</h3><p>Score = 70% × winstpercentage in de enkels + 30% × deelnamepercentage, als getal van 0 tot 100. Deelname is het aantal gespeelde enkels gedeeld door het aantal speelweken tot nu toe (${weeks}). Alleen spelers die in minimaal 70% van de speelweken een enkel speelden komen in aanmerking, nu dus ${need} of meer; de rest staat onderaan in grijs.</p><p class="note">Berekend op de wedstrijden in deze tool. De officiële ranking op poolcompetitiehilversum.nl kan iets afwijken, bijvoorbeeld als er een wedstrijd ontbreekt.</p></div>`;}
 function tabSpelers(R){
   const s=VIEW.sort,col=COLS.find(c=>c[0]===s.key)||COLS[2];
   const pl=R.players.slice().sort((a,b)=>{const x=col[3](a),y=col[3](b);return (typeof x==='string'?x.localeCompare(y):x-y)*s.dir;});
@@ -406,7 +417,7 @@ function tabSpelers(R){
    <div class="explain"><h3>Zo worden de punten berekend</h3><p>Elke gewonnen enkel of dubbel levert 1 punt op; bij een dubbel krijgen beide spelers het punt. Wie die avond een enkel speelt, krijgt daarnaast 1 punt als de bierronde gewonnen wordt en 1 bonuspunt als de partij gewonnen wordt (5 of meer winstpunten). Een wedstrijd telt alleen als gespeeld (Gesp.) als de speler die avond een enkel speelde. Ptn/w is het totaal gedeeld door dat aantal. Speelt iemand alleen een dubbel, dan telt een gewonnen dubbel wel mee voor zijn punten, maar die avond niet als gespeelde wedstrijd en zonder bierronde- en bonuspunt.</p><p><b>Betrokken:</b> bij welk deel van alle gewonnen enkels en dubbels van het team de speler aan tafel stond. <b>Eigen break / Break tegen:</b> winst% van frames waarin wij, respectievelijk de tegenstander, braken. <b>Frame 3:</b> beslissende frames gewonnen. <b>Comeb.:</b> leg gewonnen na verlies van frame 1. <b>Frame 1 %:</b> hoe vaak de speler de openingsframe van een leg wint. <b>Stunt:</b> enkel gewonnen van een tegenstander met een hogere rating vooraf. <b>Boven verw.:</b> gewonnen enkels min het aantal dat volgens de ratings vooraf te verwachten was (Elo-formule); positief betekent beter dan de rating voorspelt. <b>Gem. tegenst.:</b> gemiddelde rating van de tegenstanders in de enkels.</p></div>`;
   const series=R.players.filter(p=>p.ratings.length).map(p=>({name:p.name,pts:p.ratings.map(q=>({date:q.date,r:q.r,d:q.d}))}));
   const sel=R.players.find(p=>p.name===VIEW.player);
-  return `<section><h2>Spelers</h2>${tbl}</section>${sel?playerCard(sel,R):'<p class="note">Tik op een naam voor het spelersprofiel.</p>'}<section><h2>Punten per avond</h2>${pointsGrid(R)}</section><section><h2>Ratingverloop</h2>${lineChart(series)}</section>`;}
+  return `<section><h2>Seizoensranking enkels</h2>${rankTable(R)}</section><section><h2>Spelers</h2>${tbl}</section>${sel?playerCard(sel,R):'<p class="note">Tik op een naam voor het spelersprofiel.</p>'}<section><h2>Punten per avond</h2>${pointsGrid(R)}</section><section><h2>Ratingverloop</h2>${lineChart(series)}</section>`;}
 
 const sgn1=x=>(x>0.05?'+':x<-0.05?'−':'')+num(Math.abs(x));
 function pointsGrid(R){const ms=R.T.perMatch;if(!ms.length)return '';const pl=R.players.slice().sort((a,b)=>b.pts-a.pts);
