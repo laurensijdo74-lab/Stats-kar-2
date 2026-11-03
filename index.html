@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Karroesel 2 – statistieken</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"><style id="css">:root{--bg:#ECEFE9;--surface:#FFFFFF;--surface2:#F5F7F3;--ink:#14241B;--muted:#5D6A62;--line:#D3DAD2;--line-strong:#A9B5AC;--felt:#1D6448;--felt2:#174F39;--on-felt:#F4F7F2;--pos:#1D7A50;--neg:#B2412D;
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Karroesel 2 – statistieken</title><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"><style id="css">:root{--bg:#ECEFE9;--surface:#FFFFFF;--surface2:#F5F7F3;--ink:#14241B;--muted:#5D6A62;--line:#D3DAD2;--line-strong:#A9B5AC;--felt:#1D6448;--felt2:#174F39;--on-felt:#F4F7F2;--pos:#1D7A50;--neg:#B2412D;
 --c-s:#1D6448;--c-d:#5FA37F;--c-b:#E2B53A;--l1:#1D6448;--l2:#1E4FA8;--l3:#C9302C;--l4:#E8742A;--l5:#5B2D8C;--l6:#8A6D1F;--l7:#2B8C99;
 --disp:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -119,6 +119,7 @@ textarea{width:100%;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;backgrou
 .pending{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 14px 14px;margin-top:12px}
 .pending ul{padding-left:18px}.pending li{margin:6px 0}
 .explain{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 14px;margin-top:12px;font-size:14px;max-width:80ch}.explain h3{margin-top:12px}.explain p{margin:8px 0}
+.authbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px}
 .warn{display:inline-block;margin-left:6px;font-size:12px;color:var(--neg)}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 .scroll+.kpis{margin-top:14px}
@@ -473,27 +474,33 @@ function tabWedstrijden(R){
       <td class="frames">${L.fr.map((f,i)=>`<span class="fr ${f.won?'w':'l'}" title="Frame ${i+1}: ${f.weBreak?'wij breken':'tegenstander breekt'}, ${f.won?'gewonnen':'verloren'}">${i+1}${f.weBreak?'<sup>b</sup>':''}</span>`).join('')}</td></tr>`).join('')}
      </tbody></table></div><p class="note"><sup>b</sup> = wij braken. Rankingpunten: ${mr.rp}${mr.bonus?' (inclusief bonuspunt)':''}. Ratingsaldo deze avond: ${sgn(mr.elo)}.</p>
      <div class="lineups">${['home','away'].map(sd=>`<div><h3>${h(m[sd])}</h3><ul>${m.lineup[sd].map(p=>`<li>${h(p.name)}${p.role?` <span class="tag">${p.role.toUpperCase()}</span>`:''}<span class="muted">${p.rating}${p.delta!=null?' ('+sgn(p.delta)+')':''}</span></li>`).join('')}</ul></div>`).join('')}</div>
-     <button class="danger" data-del="${h(m.id)}">${VIEW.confirmDel===m.id?'Tik nogmaals om te verwijderen':'Wedstrijd verwijderen'}</button></div>`:''}</article>`;}).join('')}</section>`;}
+     ${USER?`<button class="danger" data-del="${h(m.id)}">${VIEW.confirmDel===m.id?'Tik nogmaals om te verwijderen':'Wedstrijd verwijderen'}</button>`:''}</div>`:''}</article>`;}).join('')}</section>`;}
 function side_score(mr){return mr.side==='H'?mr.pf+'–'+mr.pa:mr.pa+'–'+mr.pf;}
 
 function tabToevoegen(){
-  const mode=VIEW.saveMode;
+  const fbOk=!!FB, ready=VIEW.dbReady;
+  const login=!fbOk?`<p class="status">De database kon niet laden. Controleer je internetverbinding en ververs de pagina.</p>`:
+    USER?`<div class="authbar"><span>Ingelogd als <b>${h(USER.email||USER.displayName||'')}</b></span><button class="link" id="logout">Uitloggen</button></div>`:
+    `<div class="authbar"><span>Log in om wedstrijden toe te voegen of te verwijderen. Kijken kan iedereen.</span><button class="primary" id="login">Inloggen met Google</button></div>`;
+  const seed=USER&&ready&&VIEW.dbCount===0&&DATA.matches.length?`<div class="pending"><h3>Database is nog leeg</h3><p class="note">Zet eerst de ${DATA.matches.length} wedstrijden die in deze pagina staan in de database.</p><button class="primary" id="seed">${DATA.matches.length} wedstrijden in de database zetten</button></div>`:'';
   return `<section><h2>Wedstrijd toevoegen</h2>
+  ${login}${seed}
   <p class="lede">Download het wedstrijdformulier als pdf op poolcompetitiehilversum.nl en kies het hieronder. Meerdere bestanden tegelijk kan. Je kunt ook de tekst van het formulier kopiëren en plakken.</p>
   <label class="file"><input type="file" id="pdfs" accept="application/pdf" multiple><span>Kies pdf-bestanden</span></label>
   <label class="lbl" for="paste">Of plak de tekst</label>
-  <textarea id="paste" rows="6" placeholder="Karroesel 2 4 - 5 De Barbier 2 …"></textarea>
+  <textarea id="paste" rows="6" placeholder="Karroesel 2 4 - 5 De Barbier 2 …">${h(VIEW.paste||'')}</textarea>
   <button class="primary" id="parse">Tekst inlezen</button>
   ${VIEW.status?`<p class="status" role="status">${VIEW.status}</p>`:''}
   ${VIEW.pending.length?`<div class="pending"><h3>Klaar om op te slaan</h3><ul>${VIEW.pending.map((m,i)=>{const sc=m.legs.reduce((a,l)=>{const x=l.frames.filter(f=>f==='H').length,y=l.frames.filter(f=>f==='A').length;x>y?a[0]++:a[1]++;return a},[0,0]);
      const dup=DATA.matches.some(o=>o.id===m.id);
      return `<li><b>${dshort(m.date)}</b> ${h(m.home)} ${sc[0]}–${sc[1]} ${h(m.away)}${dup?' <span class="warn">vervangt bestaande</span>':''}${m.warnings.length?`<span class="warn">${h(m.warnings.join('; '))}</span>`:''} <button class="link" data-unpend="${i}">Weghalen</button></li>`}).join('')}</ul>
-     <button class="primary" id="save">${VIEW.pending.length} ${VIEW.pending.length===1?'wedstrijd':'wedstrijden'} opslaan</button></div>`:''}
-  <p class="note">${mode==='artifact'?'Opslaan bewaart de wedstrijden in deze pagina, zodat iedereen met de link dezelfde cijfers ziet.':mode==='readonly'?'Je kunt deze pagina alleen bekijken; opslaan kan de eigenaar.':mode==='local'?'Nieuwe wedstrijden worden eerst alleen in deze browser bewaard. Maak ze zichtbaar voor het hele team door de bijgewerkte index.html te downloaden en die op GitHub te vervangen.':'Opslagmogelijkheden worden gecontroleerd…'}</p>
-  ${mode==='local'?`<div class="pending"><h3>Delen met het team</h3><p class="note">Dit bestand bevat alle ${DATA.matches.length} wedstrijden die je nu ziet.</p><button class="primary" id="dlhtml">Download index.html</button></div>`:''}
+     ${USER?`<button class="primary" id="save">${VIEW.pending.length} ${VIEW.pending.length===1?'wedstrijd':'wedstrijden'} opslaan</button>`:`<p class="note">Log in om op te slaan.</p>`}</div>`:''}
+  <p class="note">${ready?`De database bevat ${VIEW.dbCount} ${VIEW.dbCount===1?'wedstrijd':'wedstrijden'}. Wijzigingen zijn direct zichtbaar voor iedereen met de link.`:fbOk?'Verbinden met de database…':''}</p>
+  <div class="pending"><h3>Back-up</h3><p class="note">Download een losse kopie van de pagina met alle wedstrijden die je nu ziet.</p><button class="link" id="dlhtml">Download index.html</button></div>
   </section>`;}
 
 function render(){
+  {const ta=document.getElementById('paste');if(ta)VIEW.paste=ta.value;}
   DATA.team='Karroesel 2';
   const R=compute(DATA.matches,DATA.team),T=R.T;
   const tabs=[['overzicht','Overzicht'],['spelers','Spelers'],['dubbels','Dubbels'],['break','Break'],['wedstrijden','Wedstrijden'],['toevoegen','Toevoegen']];
@@ -514,10 +521,13 @@ document.addEventListener('click',e=>{
   if(b.dataset.goto){VIEW.tab='wedstrijden';VIEW.open[b.dataset.goto]=true;render();const el=document.getElementById('m-'+b.dataset.goto);el&&el.scrollIntoView({block:'start'});return;}
   if(b.dataset.toggle){VIEW.open[b.dataset.toggle]=!VIEW.open[b.dataset.toggle];render();return;}
   if(b.dataset.unpend){VIEW.pending.splice(+b.dataset.unpend,1);render();return;}
-  if(b.dataset.del){const id=b.dataset.del;if(VIEW.confirmDel!==id){VIEW.confirmDel=id;render();return;}VIEW.confirmDel=null;DATA.matches=DATA.matches.filter(x=>x.id!==id);persist('Wedstrijd verwijderd.');return;}
+  if(b.dataset.del){const id=b.dataset.del;if(VIEW.confirmDel!==id){VIEW.confirmDel=id;render();return;}VIEW.confirmDel=null;fbWrite([],[id]).then(ok=>{if(ok){VIEW.status='Wedstrijd verwijderd.';render();}});return;}
   if(b.id==='dlhtml'){const url=URL.createObjectURL(new Blob([buildHtml()],{type:'text/html'}));const a=document.createElement('a');a.href=url;a.download='index.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);VIEW.status='index.html gedownload. Upload dit bestand naar GitHub om het te delen.';render();return;}
   if(b.id==='parse'){const v=document.getElementById('paste').value;if(!v.trim()){VIEW.status='Plak eerst de tekst van een wedstrijdformulier.';render();return;}addTexts([v]);return;}
-  if(b.id==='save'){const ids=new Set(VIEW.pending.map(m=>m.id));DATA.matches=DATA.matches.filter(m=>!ids.has(m.id)).concat(VIEW.pending.map(({warnings,...m})=>m));const n=VIEW.pending.length;VIEW.pending=[];persist(n+(n===1?' wedstrijd':' wedstrijden')+' opgeslagen.');return;}
+  if(b.id==='save'){const list=VIEW.pending.map(({warnings,...m})=>m);fbWrite(list,[]).then(ok=>{if(ok){VIEW.pending=[];VIEW.paste='';VIEW.status=list.length+(list.length===1?' wedstrijd':' wedstrijden')+' opgeslagen.';render();}});return;}
+  if(b.id==='seed'){fbWrite(DATA.matches.slice(),[]).then(ok=>{if(ok){VIEW.status='Bestaande wedstrijden staan nu in de database.';render();}});return;}
+  if(b.id==='login'){fbLogin();return;}
+  if(b.id==='logout'){FB&&FB.auth.signOut();return;}
 });
 document.addEventListener('change',e=>{
   if(e.target.id==='team'){DATA.team=e.target.value;VIEW.player=null;render();return;}
@@ -545,7 +555,7 @@ function buildHtml(){
   const g=id=>document.getElementById(id).textContent;
   const head=g('head-src');
   const json=JSON.stringify(DATA).replace(/</g,'\\u003c');
-  return '<!doctype html>\n<html lang="nl"><head>'+head+'<style id="css">'+g('css')+'</style></head><body><div id="root"></div>'+
+  return '<!doctype html>\n<html lang="nl"><head>'+head+'<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"><\/script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"><\/script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"><\/script>'+'<style id="css">'+g('css')+'</style></head><body><div id="root"></div>'+
    '<script type="text/plain" id="head-src">'+head+'<\/script><script type="application/json" id="data">'+json+'<\/script><script id="app">'+g('app')+'<\/script></body></html>';}
 async function persist(msg){
   if(VIEW.saveMode==='artifact'&&ART){VIEW.status='Opslaan…';render();
@@ -557,8 +567,35 @@ async function persist(msg){
     return;}
   try{localStorage.setItem('k2-matches',JSON.stringify(DATA.matches));VIEW.status=msg+' Bewaard in deze browser.';}catch(_){VIEW.status=msg+' Let op: alleen tot je de pagina sluit.';}
   render();}
-try{const loc=JSON.parse(localStorage.getItem('k2-matches')||'null');if(Array.isArray(loc)){const ids=new Set(DATA.matches.map(m=>m.id));loc.forEach(m=>{if(m&&m.id&&!ids.has(m.id))DATA.matches.push(m)});}}catch(_){}
+const FBCFG={apiKey:"AIzaSyDF0sUCcSxjI4mJ4kMkhrfUM69JTHrpSmw",authDomain:"statskar2.firebaseapp.com",projectId:"statskar2",storageBucket:"statskar2.firebasestorage.app",messagingSenderId:"1078135872071",appId:"1:1078135872071:web:e03ab63b097402457faf62"};
+let FB=null,USER=null;
+const docId=id=>String(id).replace(/\//g,'_');
+function fbErr(e){const c=e&&e.code||'';
+  if(c==='permission-denied')return 'Je account mag niet opslaan. Controleer of je e-mailadres in de Firestore-regels staat.';
+  if(c==='auth/unauthorized-domain')return 'Dit adres staat niet bij Authorized domains in Firebase Authentication.';
+  if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request')return 'Inloggen afgebroken.';
+  return 'Er ging iets mis ('+h(c||(e&&e.message)||e)+').';}
+async function fbWrite(sets,dels){
+  if(!FB||!USER){VIEW.status='Log eerst in.';render();return false;}
+  VIEW.status='Opslaan…';render();
+  try{for(let k=0;k<sets.length+dels.length;k+=400){const batch=FB.db.batch();
+      sets.slice(k,k+400).forEach(m=>batch.set(FB.db.collection('matches').doc(docId(m.id)),JSON.parse(JSON.stringify(m))));
+      if(k===0)dels.forEach(id=>batch.delete(FB.db.collection('matches').doc(docId(id))));
+      await batch.commit();}
+    return true;}
+  catch(e){VIEW.status=fbErr(e);render();return false;}}
+async function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
+  try{await FB.auth.signInWithPopup(p);}
+  catch(e){if(e&&(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')){try{await FB.auth.signInWithRedirect(p);}catch(e2){VIEW.status=fbErr(e2);render();}}else{VIEW.status=fbErr(e);render();}}}
+function initFirebase(){
+  if(!window.firebase){render();return;}
+  try{firebase.initializeApp(FBCFG);FB={auth:firebase.auth(),db:firebase.firestore()};}catch(e){FB=null;render();return;}
+  FB.auth.onAuthStateChanged(u=>{USER=u;render();});
+  FB.auth.getRedirectResult().catch(e=>{VIEW.status=fbErr(e);render();});
+  FB.db.collection('matches').onSnapshot(snap=>{VIEW.dbReady=true;VIEW.dbCount=snap.size;
+      if(snap.size)DATA.matches=snap.docs.map(d=>d.data());render();},
+    e=>{VIEW.status='De database is niet bereikbaar: '+fbErr(e);render();});
+}
 render();
-(async()=>{try{ART=window.claude&&window.claude.use?await window.claude.use('artifact'):null;}catch(_){ART=null;}
-  VIEW.saveMode=ART?'artifact':'local';if(VIEW.tab==='toevoegen')render();})();
+initFirebase();
 </script></body></html>
