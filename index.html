@@ -119,6 +119,7 @@ textarea{width:100%;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;backgrou
 .pending{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 14px 14px;margin-top:12px}
 .pending ul{padding-left:18px}.pending li{margin:6px 0}
 .explain{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 14px;margin-top:12px;font-size:14px;max-width:80ch}.explain h3{margin-top:12px}.explain p{margin:8px 0}
+.authmsg{flex-basis:100%;margin:0;color:var(--neg);font-weight:600}.authbar .link{flex-basis:100%;text-align:left;font-size:13px;font-weight:500}
 .authbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px}
 .warn{display:inline-block;margin-left:6px;font-size:12px;color:var(--neg)}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
@@ -224,7 +225,7 @@ function compute(matches,team){
       if(leg.type==='B')continue;
       const share=1;
       for(const name of our){
-        const q=gp(name);q.played.add(m.id);const R=leg.type==='S'?q.S:q.D;
+        const q=gp(name);if(leg.type==='S')q.played.add(m.id);const R=leg.type==='S'?q.S:q.D;
         won?R.w++:R.l++;R.fw+=fw;R.fl+=fl;if(won){q.pts+=1;if(leg.type==='S')q.ptS++;else q.ptD++;}
         q.perMatch[m.id]=(q.perMatch[m.id]||0)+(won?share:0);
         fr.forEach(f=>{const b=f.weBreak?q.own:q.opp;b[1]++;if(f.won)b[0]++;});
@@ -402,7 +403,7 @@ function tabSpelers(R){
   const pl=R.players.slice().sort((a,b)=>{const x=col[3](a),y=col[3](b);return (typeof x==='string'?x.localeCompare(y):x-y)*s.dir;});
   const tbl=`<div class="scroll"><table class="t players"><thead><tr>${COLS.map(c=>`<th><button class="sort ${c[0]===s.key?'on':''}" data-sort="${c[0]}">${h(c[1])}${c[0]===s.key?(s.dir<0?' ▾':' ▴'):''}</button></th>`).join('')}</tr></thead>
    <tbody>${pl.map(p=>`<tr class="${VIEW.player===p.name?'sel':''}">${COLS.map((c,i)=>i===0?`<th>${c[2](p)}</th>`:`<td>${c[2](p)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-   <div class="explain"><h3>Zo worden de punten berekend</h3><p>Elke gewonnen enkel of dubbel levert 1 punt op; bij een dubbel krijgen beide spelers het punt. Wie die avond meespeelt, krijgt daarnaast 1 punt als de bierronde gewonnen wordt en 1 bonuspunt als de partij gewonnen wordt (5 of meer winstpunten). Ptn/w is het totaal gedeeld door het aantal wedstrijden waarin de speler meespeelde; avonden als reserve tellen niet mee.</p><p><b>Betrokken:</b> bij welk deel van alle gewonnen enkels en dubbels van het team de speler aan tafel stond. <b>Eigen break / Break tegen:</b> winst% van frames waarin wij, respectievelijk de tegenstander, braken. <b>Frame 3:</b> beslissende frames gewonnen. <b>Comeb.:</b> leg gewonnen na verlies van frame 1. <b>Frame 1 %:</b> hoe vaak de speler de openingsframe van een leg wint. <b>Stunt:</b> enkel gewonnen van een tegenstander met een hogere rating vooraf. <b>Boven verw.:</b> gewonnen enkels min het aantal dat volgens de ratings vooraf te verwachten was (Elo-formule); positief betekent beter dan de rating voorspelt. <b>Gem. tegenst.:</b> gemiddelde rating van de tegenstanders in de enkels.</p></div>`;
+   <div class="explain"><h3>Zo worden de punten berekend</h3><p>Elke gewonnen enkel of dubbel levert 1 punt op; bij een dubbel krijgen beide spelers het punt. Wie die avond een enkel speelt, krijgt daarnaast 1 punt als de bierronde gewonnen wordt en 1 bonuspunt als de partij gewonnen wordt (5 of meer winstpunten). Een wedstrijd telt alleen als gespeeld (Gesp.) als de speler die avond een enkel speelde. Ptn/w is het totaal gedeeld door dat aantal. Speelt iemand alleen een dubbel, dan telt een gewonnen dubbel wel mee voor zijn punten, maar die avond niet als gespeelde wedstrijd en zonder bierronde- en bonuspunt.</p><p><b>Betrokken:</b> bij welk deel van alle gewonnen enkels en dubbels van het team de speler aan tafel stond. <b>Eigen break / Break tegen:</b> winst% van frames waarin wij, respectievelijk de tegenstander, braken. <b>Frame 3:</b> beslissende frames gewonnen. <b>Comeb.:</b> leg gewonnen na verlies van frame 1. <b>Frame 1 %:</b> hoe vaak de speler de openingsframe van een leg wint. <b>Stunt:</b> enkel gewonnen van een tegenstander met een hogere rating vooraf. <b>Boven verw.:</b> gewonnen enkels min het aantal dat volgens de ratings vooraf te verwachten was (Elo-formule); positief betekent beter dan de rating voorspelt. <b>Gem. tegenst.:</b> gemiddelde rating van de tegenstanders in de enkels.</p></div>`;
   const series=R.players.filter(p=>p.ratings.length).map(p=>({name:p.name,pts:p.ratings.map(q=>({date:q.date,r:q.r,d:q.d}))}));
   const sel=R.players.find(p=>p.name===VIEW.player);
   return `<section><h2>Spelers</h2>${tbl}</section>${sel?playerCard(sel,R):'<p class="note">Tik op een naam voor het spelersprofiel.</p>'}<section><h2>Punten per avond</h2>${pointsGrid(R)}</section><section><h2>Ratingverloop</h2>${lineChart(series)}</section>`;}
@@ -410,8 +411,8 @@ function tabSpelers(R){
 const sgn1=x=>(x>0.05?'+':x<-0.05?'−':'')+num(Math.abs(x));
 function pointsGrid(R){const ms=R.T.perMatch;if(!ms.length)return '';const pl=R.players.slice().sort((a,b)=>b.pts-a.pts);
   return `<div class="scroll"><table class="t matrix"><thead><tr><th>Speler</th>${ms.map(mr=>`<th>${dshort(mr.m.date)}<br><span class="muted">${h(mr.opp)}</span></th>`).join('')}<th>Totaal</th></tr></thead><tbody>
-  ${pl.map(p=>`<tr><th>${h(p.name)}</th>${ms.map(mr=>{const v=p.perMatch[mr.m.id];if(v==null)return `<td class="na">${p.ratings.some(r=>r.date===mr.m.date)?'R':'–'}</td>`;return `<td class="heat" style="--r:${Math.min(1,v/5)}">${v}</td>`;}).join('')}<th>${p.pts}</th></tr>`).join('')}
-  </tbody></table></div><p class="note">Punten per speler per avond, inclusief bierronde en bonuspunt. R = reserve, niet gespeeld.</p>`;}
+  ${pl.map(p=>`<tr><th>${h(p.name)}</th>${ms.map(mr=>{const v=p.perMatch[mr.m.id];if(v==null)return `<td class="na">${p.ratings.some(r=>r.date===mr.m.date)?'R':'–'}</td>`;return `<td class="heat" style="--r:${Math.min(1,v/5)}">${v}${p.played.has(mr.m.id)?'':'*'}</td>`;}).join('')}<th>${p.pts}</th></tr>`).join('')}
+  </tbody></table></div><p class="note">Punten per speler per avond, inclusief bierronde en bonuspunt. R = reserve, niet gespeeld. * = alleen dubbel gespeeld, telt niet als gespeelde wedstrijd.</p>`;}
 function playerCard(p,R){
   const posKeys=Object.keys(p.pos).sort((a,b)=>(a[0]==='S'?0:4)+ +a.slice(1)-((b[0]==='S'?0:4)+ +b.slice(1)));
   return `<section class="card" id="profile"><div class="card-head"><h2>${h(p.name)}</h2><button class="x" data-player="" aria-label="Sluit profiel">Sluiten</button></div>
@@ -481,7 +482,7 @@ function tabToevoegen(){
   const fbOk=!!FB, ready=VIEW.dbReady;
   const login=!fbOk?`<p class="status">De database kon niet laden. Controleer je internetverbinding en ververs de pagina.</p>`:
     USER?`<div class="authbar"><span>Ingelogd als <b>${h(USER.email||USER.displayName||'')}</b></span><button class="link" id="logout">Uitloggen</button></div>`:
-    `<div class="authbar"><span>Log in om wedstrijden toe te voegen of te verwijderen. Kijken kan iedereen.</span><button class="primary" id="login">Inloggen met Google</button></div>`;
+    `<div class="authbar"><span>Log in om wedstrijden toe te voegen of te verwijderen. Kijken kan iedereen.</span><button class="primary" id="login">Inloggen met Google</button>${VIEW.authMsg?`<p class="authmsg" role="status">${VIEW.authMsg}</p>`:''}<button class="link" id="login2">Lukt het niet? Inloggen via doorsturen</button></div>`;
   const seed=USER&&ready&&VIEW.dbCount===0&&DATA.matches.length?`<div class="pending"><h3>Database is nog leeg</h3><p class="note">Zet eerst de ${DATA.matches.length} wedstrijden die in deze pagina staan in de database.</p><button class="primary" id="seed">${DATA.matches.length} wedstrijden in de database zetten</button></div>`:'';
   return `<section><h2>Wedstrijd toevoegen</h2>
   ${login}${seed}
@@ -526,7 +527,8 @@ document.addEventListener('click',e=>{
   if(b.id==='parse'){const v=document.getElementById('paste').value;if(!v.trim()){VIEW.status='Plak eerst de tekst van een wedstrijdformulier.';render();return;}addTexts([v]);return;}
   if(b.id==='save'){const list=VIEW.pending.map(({warnings,...m})=>m);fbWrite(list,[]).then(ok=>{if(ok){VIEW.pending=[];VIEW.paste='';VIEW.status=list.length+(list.length===1?' wedstrijd':' wedstrijden')+' opgeslagen.';render();}});return;}
   if(b.id==='seed'){fbWrite(DATA.matches.slice(),[]).then(ok=>{if(ok){VIEW.status='Bestaande wedstrijden staan nu in de database.';render();}});return;}
-  if(b.id==='login'){fbLogin();return;}
+  if(b.id==='login'){fbLogin(false);return;}
+  if(b.id==='login2'){fbLogin(true);return;}
   if(b.id==='logout'){FB&&FB.auth.signOut();return;}
 });
 document.addEventListener('change',e=>{
@@ -584,14 +586,15 @@ async function fbWrite(sets,dels){
       await batch.commit();}
     return true;}
   catch(e){VIEW.status=fbErr(e);render();return false;}}
-async function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
-  try{await FB.auth.signInWithPopup(p);}
-  catch(e){if(e&&(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')){try{await FB.auth.signInWithRedirect(p);}catch(e2){VIEW.status=fbErr(e2);render();}}else{VIEW.status=fbErr(e);render();}}}
+async function fbLogin(redirect){const p=new firebase.auth.GoogleAuthProvider();if(p.setCustomParameters)p.setCustomParameters({prompt:'select_account'});
+  VIEW.authMsg=redirect?'Je wordt doorgestuurd naar Google…':'Er opent een venster van Google. Zie je niets, controleer dan of er een nieuw tabblad is geopend.';render();
+  try{if(redirect){await FB.auth.signInWithRedirect(p);return;}await FB.auth.signInWithPopup(p);VIEW.authMsg='';render();}
+  catch(e){if(!redirect&&e&&(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')){fbLogin(true);return;}VIEW.authMsg=fbErr(e);render();}}
 function initFirebase(){
   if(!window.firebase){render();return;}
   try{firebase.initializeApp(FBCFG);FB={auth:firebase.auth(),db:firebase.firestore()};}catch(e){FB=null;render();return;}
   FB.auth.onAuthStateChanged(u=>{USER=u;render();});
-  FB.auth.getRedirectResult().catch(e=>{VIEW.status=fbErr(e);render();});
+  FB.auth.getRedirectResult().catch(e=>{VIEW.authMsg=fbErr(e);VIEW.tab='toevoegen';render();});
   FB.db.collection('matches').onSnapshot(snap=>{VIEW.dbReady=true;VIEW.dbCount=snap.size;
       if(snap.size)DATA.matches=snap.docs.map(d=>d.data());render();},
     e=>{VIEW.status='De database is niet bereikbaar: '+fbErr(e);render();});
