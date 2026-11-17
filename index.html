@@ -247,8 +247,27 @@ function compute(matches,team){
         return matches.length===1?matches:[];
       }).filter((n,i,a)=>a.indexOf(n)===i);
 
+      // Official leg scores take precedence over extracted frame labels. This also
+      // repairs legacy Firebase imports with duplicated or misread frame tokens.
+      const officialH=Number(leg.scoreHome),officialA=Number(leg.scoreAway);
+      const hasOfficial=Number.isInteger(officialH)&&Number.isInteger(officialA)&&
+        officialH>=0&&officialA>=0&&Math.max(officialH,officialA)===2&&Math.min(officialH,officialA)<=1;
+      const rawFrames=Array.isArray(leg.frames)?leg.frames:[];
+      let frameSides=rawFrames.filter(f=>f==='H'||f==='A');
+      if(hasOfficial){
+        const actualH=frameSides.filter(f=>f==='H').length;
+        const actualA=frameSides.filter(f=>f==='A').length;
+        if(actualH!==officialH||actualA!==officialA||frameSides.length!==rawFrames.length){
+          // Unknown frame order: retain only verified total; never invent a break order.
+          frameSides=Array(officialH).fill('H').concat(Array(officialA).fill('A'));
+        }
+      }else if(frameSides.length>3 || Math.max(frameSides.filter(f=>f==='H').length,frameSides.filter(f=>f==='A').length)>2){
+        // A standard best-of-three leg cannot contain more than three frames.
+        // Do not count malformed legacy frame strings as additional frames.
+        frameSides=frameSides.slice(0,3);
+      }
       let fw=0,fl=0;const fr=[];
-      leg.frames.forEach((f,i)=>{const won=f===side,breakSide=i%2===0?'A':'H',weBreak=breakSide===side;
+      frameSides.forEach((f,i)=>{const won=f===side,breakSide=i%2===0?'A':'H',weBreak=breakSide===side;
         fr.push({won,weBreak});won?fw++:fl++;
         T.frames[1]++;if(won)T.frames[0]++;
         const b=weBreak?T.own:T.opp;b[1]++;if(won)b[0]++;
