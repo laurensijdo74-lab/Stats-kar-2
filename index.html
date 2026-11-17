@@ -171,17 +171,21 @@ function parseMatchText(raw){
     const Hn=H.map(norm),An=A.map(norm);
     const frames=frameList(r[6]).map(w=>{const p=w.split('/').map(norm);
       if(p.every(x=>Hn.includes(x)))return 'H';if(p.every(x=>An.includes(x)))return 'A';return null;});
-    if(frames.includes(null)) warnings.push(r[1]+' '+n+': framewinnaar onduidelijk');
+    if(frames.includes(null)) warnings.push(r[1]+' '+n+': framewinnaar onduidelijk; officiële leguitslag wordt aangehouden');
     const hw=frames.filter(f=>f==='H').length,aw=frames.filter(f=>f==='A').length;
-    if(hw!==+r[4]||aw!==+r[5]) warnings.push(r[1]+' '+n+': frames kloppen niet met uitslag');
-    legs.push({type,n,home:H,away:A,frames:frames.map(f=>f||'?')});
+    if(hw!==+r[4]||aw!==+r[5]) warnings.push(r[1]+' '+n+': frames kloppen niet met uitslag; officiële leguitslag wordt aangehouden');
+    legs.push({type,n,home:H,away:A,frames:frames.map(f=>f||'?'),scoreHome:+r[4],scoreAway:+r[5]});
   }
   const bm=L.match(/Bierronde (.+?) (\d)-(\d) (1:.+)$/);
   if(bm){
     const frames=frameList(bm[4]).map(w=>norm(w)===norm(home)?'H':norm(w)===norm(away)?'A':'?');
-    legs.push({type:'B',n:1,home:[home],away:[away],frames});
+    legs.push({type:'B',n:1,home:[home],away:[away],frames,scoreHome:+bm[2],scoreAway:+bm[3]});
   } else warnings.push('Geen bierronde gevonden');
   if(legs.length<9) warnings.push('Slechts '+legs.length+' van 9 legs gevonden');
+   const headerScore=t.slice(0,hm.index).match(/(\d+)\s*-\s*(\d+)/);
+   if(headerScore){const sh=legs.filter(l=>l.scoreHome>l.scoreAway).length,sa=legs.filter(l=>l.scoreAway>l.scoreHome).length;
+     if(sh!==+headerScore[1]||sa!==+headerScore[2]) warnings.push('LET OP: berekende uitslag '+sh+'-'+sa+' wijkt af van officiële '+headerScore[1]+'-'+headerScore[2]+'. Controleer het formulier.');
+   }
   return {id:date+'|'+home+'|'+away,date,season:sm?sm[1].trim():'',venue:vm?vm[1].trim():'',status:vm?vm[2]:'',home,away,lineup,legs,warnings};
 }
 function splitDocs(raw){
@@ -216,7 +220,7 @@ function compute(matches,team){
         if(leg.type==='B'){const bb=weBreak?T.bOwn:T.bOpp;bb[1]++;if(won)bb[0]++;}
         if(i<3){T.fno[side][i][1]++;if(won)T.fno[side][i][0]++;}
       });
-      const won=fw>fl,key=leg.type+leg.n;won?pf++:pa++;
+      const won=Number.isFinite(leg.scoreHome)&&Number.isFinite(leg.scoreAway)?(side==='H'?leg.scoreHome>leg.scoreAway:leg.scoreAway>leg.scoreHome):fw>fl,key=leg.type+leg.n;won?pf++:pa++;
       if(leg.type==='S'){T.S[1]++;if(won){T.S[0]++;mr.sp++;}}else if(leg.type==='D'){T.D[1]++;if(won){T.D[0]++;mr.dp++;}}else{T.B[1]++;if(won){T.B[0]++;mr.bp++;}}
       const ps=T.pos[key]||(T.pos[key]=z());ps[1]++;if(won)ps[0]++;
       if(won){fl?T.w21++:T.w20++;}else{fw?T.l12++:T.l02++;}
