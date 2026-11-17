@@ -174,7 +174,20 @@ function parseMatchText(raw){
       const k=Math.ceil(words.length/2);split=[words.slice(0,k).join(' ').split('/'),words.slice(k).join(' ').split('/')];
       warnings.push(r[1]+' '+n+': controleer spelersnamen');
     }
-    const H=split[0].map(s=>s.trim()),A=split[1].map(s=>s.trim());
+    // Reconcile each side independently with the official team lineup. Never
+    // interpret an opponent as a teammate when PDF columns have been flattened.
+    const canonical=(side,expected)=>{
+      const names=lineup[side].map(p=>p.name);
+      const candidate=split[side==='home'?0:1].map(x=>x.trim());
+      if(candidate.length===expected&&candidate.every(x=>names.some(n=>norm(n)===norm(x))))
+        return candidate.map(x=>names.find(n=>norm(n)===norm(x)));
+      const source=norm(r[3]);
+      const found=names.filter(n=>source.includes(norm(n)));
+      return found.length===expected?found:null;
+    };
+    const fixedH=canonical('home',type==='D'?2:1),fixedA=canonical('away',type==='D'?2:1);
+    if(!fixedH||!fixedA){warnings.push(r[1]+' '+n+': teamindeling niet betrouwbaar; controle nodig');continue;}
+    const H=fixedH,A=fixedA;
     const Hn=H.map(norm),An=A.map(norm);
     const frames=frameList(r[6]).map(w=>{
       const p=w.split('/').map(norm);
@@ -225,7 +238,15 @@ function compute(matches,team){
     for(const p of ourL){const q=gp(p.name);q.inLineup++;q.ratings.push({date:m.date,r:p.rating,d:p.delta});if(p.role)q.role=p.role;if(p.delta!=null)T.elo+=p.delta;}
     let pf=0,pa=0;const mr={m,side,opp:side==='H'?m.away:m.home,legs:[],sp:0,dp:0,bp:0};
     for(const leg of m.legs){
-      const our=side==='H'?leg.home:leg.away,their=side==='H'?leg.away:leg.home;
+      const ourRaw=side==='H'?leg.home:leg.away,their=side==='H'?leg.away:leg.home;
+      const ownNames=ourL.map(p=>p.name);
+      const our=ourRaw.flatMap(n=>{
+        if(ownNames.some(x=>norm(x)===norm(n)))return [ownNames.find(x=>norm(x)===norm(n))];
+        // Older imports could merge two names from opposing teams into one.
+        const matches=ownNames.filter(x=>norm(n).includes(norm(x)));
+        return matches.length===1?matches:[];
+      }).filter((n,i,a)=>a.indexOf(n)===i);
+
       let fw=0,fl=0;const fr=[];
       leg.frames.forEach((f,i)=>{const won=f===side,breakSide=i%2===0?'A':'H',weBreak=breakSide===side;
         fr.push({won,weBreak});won?fw++:fl++;
